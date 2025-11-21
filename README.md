@@ -1,5 +1,5 @@
 
-# FixIt Splunk Challenge — SOC Analyst Walkthrough
+# FixIt Splunk Challenge — Walkthrough
 
 ## Overview
 This project is my hands-on walkthrough of the **FixIt AI-Assisted Splunk Challenge**, a scenario designed to simulate real-world SOC responsibilities involving log ingestion, parsing failures, field extraction, and event investigation.
