@@ -185,14 +185,13 @@ Writing a triage playbook ensures analysts handle incidents consistently.
 
 ```text
 FixIt-Splunk-Challenge/
-├── data/               # Sample logs from challenge
+├── Splunk-Lab-Writeup.pdf               # Full Writeup follow through
 ├── props.conf          # Line-breaking and parsing fixes
-├── transforms.conf     # Field extraction regex
+├── field-extraction-regex.txt    # Field extraction regex
 ├── README.md           # This document
 └── queries/            # SPL queries used during the project
 ```
 
----
 
 ## 🧭 Final Thoughts
 
