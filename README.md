@@ -203,16 +203,3 @@ This project sharpened practical SOC skills that directly transfer to real-world
 * Normalizing logs for search and dashboards
 * Designing triage workflows
 
-If you're a SOC analyst or aspiring one, mastering ingestion and parsing is a force multiplier — it unlocks real detection engineering capability.
-
----
-
-### ⭐ Connect With Me
-
-If you’d like to discuss the project, detections, or SOC workflows, feel free to reach out:
-
-**LinkedIn:** <your-link>
-**Portfolio:** <your-github-link>
-
-```}]}
-```
