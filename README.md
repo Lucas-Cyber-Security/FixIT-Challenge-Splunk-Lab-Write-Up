@@ -1,38 +1,218 @@
-# 🛠️ TryHackMe: FIXIT Splunk Challenge
+
+# FixIt Splunk Challenge — SOC Analyst Walkthrough
 
 ## Overview
+This project is my hands-on walkthrough of the **FixIt AI-Assisted Splunk Challenge**, a scenario designed to simulate real-world SOC responsibilities involving log ingestion, parsing failures, field extraction, and event investigation.
 
-This project documents my completion of the **TryHackMe: FIXIT** lab, where I acted as a SOC-L2 candidate at a fictional company, **Cybertees Ltd**. The goal of this lab was to troubleshoot and resolve issues within a Splunk deployment related to log ingestion, multi-line event boundaries, and field extraction using custom configurations and regular expressions.
+The goal of this write-up is to document:
+- The technical issues I encountered
+- How I diagnosed and corrected Splunk ingestion problems
+- The regex and props.conf changes used to fix multi-line and improperly parsed events
+- The steps I took to validate data integrity and restore analyst visibility
+- Key lessons learned and how they apply to real-world SOC environments
 
-This hands-on challenge reflects real-world scenarios often encountered by Security Operations Center (SOC) analysts and showcases my ability to diagnose, fix, and analyze complex log data.
+---
 
-## 📚 Lab Focus Areas
+## 🛠️ Environment & Data Sources
+**Tools Used:**
+- Splunk Free (local deployment)
+- Windows event logs
+- Sysmon operational logs
+- Sample malformed logs provided by the FixIt challenge
 
-- Fixing improperly parsed multi-line logs in Splunk
-- Configuring `props.conf`, `fields.conf`, and `transforms.conf`
-- Building custom regex patterns to extract fields from unstructured logs
-- Conducting basic event analysis on the ingested data
+**Core Focus Areas:**
+- Multi-line event parsing
+- Field extraction using regex
+- Data normalization for search and dashboards
+- Triage workflow and detection logic
 
-## 🧠 Skills Demonstrated
+---
 
-- 🔍 **Regex Mastery**: Designed expressions to extract usernames, departments, IPs, and more  
-- 🧾 **Splunk Tuning**: Used `BREAK_ONLY_BEFORE`, `SHOULD_LINEMERGE`, and `TIME_FORMAT` for log structuring  
-- 🛠️ **Troubleshooting**: Diagnosed parsing errors and corrected ingestion behavior  
-- 📈 **Log Analysis**: Queried and interpreted parsed data for actionable insights
+## 🔍 Initial Problem Summary
+When ingesting the provided logs, several issues were immediately clear:
 
-## 🖥️ Tools & Technologies
+1. **Events were merging into single long blobs**, breaking timestamps and splitting fields incorrectly.
+2. **Key fields (username, department, domain, src_ip, country)** were not extracting due to missing props/transforms configuration.
+3. **Searches returned inconsistent results**, with some logs not showing up in index-time searches.
 
-- Splunk Enterprise (Web Interface & Configuration Files)  
-- Linux Terminal (Config file editing)  
-- Regular Expressions (Regex)  
-- TryHackMe Virtual Environment  
-- ChatGPT (Regex and config assistance)
+The root cause: Incorrect event boundaries and missing field extraction rules.
 
-## 📂 Repository Structure
+---
 
-```bash
-FixIT-Splunk-Challenge/
-├── README.md                   # This file
-├── FIXIT-Lab-Writeup.pdf       # Detailed project report
-├── props.conf                  # Sample config used to define event boundaries
-├── field-extraction-regex.txt  # Regex pattern used to extract fields
+## 🧪 Step 1: Fixing Multi-Line Event Boundaries
+Splunk sometimes misinterprets Windows logs or application logs when they span multiple lines.
+
+To correct this, I updated **props.conf** with explicit line-breaking logic:
+
+```ini
+[your_sourcetype]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([
+]+)
+TRUNCATE = 0
+TIME_FORMAT = %Y-%m-%d %H:%M:%S
+TIME_PREFIX = ^\[
+````
+
+This forced Splunk to:
+
+* Treat each event as independent
+* Break lines correctly
+* Parse timestamps reliably
+
+After re-ingesting the logs, I confirmed **correct event counts** using:
+
+```spl
+| metadata type=sourcetypes
+```
+
+---
+
+## 🧪 Step 2: Creating Regex-Based Field Extractions
+
+The FixIt dataset required extracting the following fields:
+
+* `username`
+* `department`
+* `domain`
+* `src_ip`
+* `country`
+
+Example extraction written using Splunk Field Extractor + manual regex refinement:
+
+```regex
+User=(?<username>[A-Za-z0-9._-]+).*?Dept=(?<department>[A-Za-z]+).*?Domain=(?<domain>[A-Za-z0-9.-]+).*?SrcIP=(?<src_ip>[0-9.]+).*?Country=(?<country>[A-Za-z]+)
+```
+
+I validated extraction coverage with:
+
+```spl
+| stats count by username, department, domain, src_ip, country
+```
+
+---
+
+## 🧪 Step 3: Restoring Analyst Searchability
+
+With ingestion and fields fixed, I rebuilt dashboards and confirmed expected behavior.
+
+Validation queries:
+
+### Show event distribution
+
+```spl
+index=fixit_logs
+| timechart count by sourcetype
+```
+
+### Check for missing or malformed fields
+
+```spl
+index=fixit_logs
+| where isnull(username) OR username=""
+| stats count by sourcetype
+```
+
+### Verify normalization
+
+```spl
+index=fixit_logs
+| stats values(username) values(src_ip) by _time
+```
+
+This confirmed clean, searchable data for SOC triage.
+
+---
+
+## 🛡️ Step 4: Writing the Triage Playbook
+
+I documented a SOC-ready triage workflow covering:
+
+### 1. **Alert Trigger**
+
+Identify suspicious login or anomalous activity based on:
+
+* Impossible travel
+* Department mismatch
+* Failed logon spikes
+
+### 2. **Initial Query**
+
+```spl
+index=fixit_logs username="<user>"
+| stats count, values(src_ip), values(country), values(department)
+```
+
+### 3. **Contextual Enrichment**
+
+Cross-reference with:
+
+* Known geolocation patterns
+* Department alignment
+* Past login behavior
+
+### 4. **Escalation Criteria**
+
+Escalate if:
+
+* Login from unusual country
+* Source IP linked to other anomalies
+* Privileged account activity
+
+---
+
+## 📈 Key Lessons Learned
+
+### ✔ Importance of proper event boundaries
+
+Even perfect data becomes unusable if Splunk can’t break lines correctly.
+
+### ✔ Regex must match real-world messy log formats
+
+Field extraction is often iterative — test, refine, test again.
+
+### ✔ Verification queries are your safety net
+
+Always confirm ingestion **before** building alerts.
+
+### ✔ Documentation increases repeatability
+
+Writing a triage playbook ensures analysts handle incidents consistently.
+
+---
+
+## 📦 Repository Structure
+
+```text
+FixIt-Splunk-Challenge/
+├── data/               # Sample logs from challenge
+├── props.conf          # Line-breaking and parsing fixes
+├── transforms.conf     # Field extraction regex
+├── README.md           # This document
+└── queries/            # SPL queries used during the project
+```
+
+---
+
+## 🧭 Final Thoughts
+
+This project sharpened practical SOC skills that directly transfer to real-world roles:
+
+* Debugging ingestion issues
+* Writing and validating field extractions
+* Normalizing logs for search and dashboards
+* Designing triage workflows
+
+If you're a SOC analyst or aspiring one, mastering ingestion and parsing is a force multiplier — it unlocks real detection engineering capability.
+
+---
+
+### ⭐ Connect With Me
+
+If you’d like to discuss the project, detections, or SOC workflows, feel free to reach out:
+
+**LinkedIn:** <your-link>
+**Portfolio:** <your-github-link>
+
+```}]}
+```
